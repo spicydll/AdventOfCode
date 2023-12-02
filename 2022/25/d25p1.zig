@@ -46,19 +46,61 @@ fn fromSnafu(buffer: []const u8) ?i64 {
     return num;
 }
 
-fn toSnafu(number: i64, buffer: []u8) !void {
-    
+fn toSnafu(number: i64, buffer: []u8) !usize {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var stack = std.ArrayList(u8).init(allocator);
+    var carry = false;
+    var digit: u8 = undefined;
+    var l_number = number;
+
+    while (l_number != 0) {
+        var r: i64 = @mod(l_number, 5);
+        defer l_number = @divFloor(l_number, 5);
+
+        if (carry) {
+            r += 1;
+            carry = false;
+        }
+
+        if (r > 2) {
+            r -= 5;
+            carry = true;
+        }
+        digit = switch (r) {
+            0 => '0',
+            1 => '1',
+            2 => '2',
+            -2 => '=',
+            -1 => '-',
+            else => '?',
+        };
+
+        try stack.append(digit);
+    }
+
+    const stack_size = stack.items.len;
+    for (0..stack_size) |i| {
+        buffer[i] = stack.pop();
+    }
+
+    return stack_size;
 }
 
 pub fn main() !void {
     const stdin = std.io.getStdIn();
     const stdout = std.io.getStdOut();
     var buffer: [64]u8 = undefined;
-    //    var sum: i64 = 0;
+    var sum: i64 = 0;
+    var out: [100]u8 = undefined;
 
     while (true) {
         const input = (try nextLine(stdin.reader(), &buffer)) orelse break;
 
-        try stdout.writer().print("{d}\n", .{fromSnafu(input).?});
+        sum += fromSnafu(input).?;
     }
+
+    const size: usize = (try toSnafu(sum, &out));
+    try stdout.writer().print("Sum: {s}\n", .{out[0..size]});
 }
