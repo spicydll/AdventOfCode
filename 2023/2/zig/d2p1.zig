@@ -6,16 +6,29 @@ const Pull = struct {
     blue: u32
 };
 
+const Color = enum {
+    red, green, blue
+};
+
+// very much a hack!!
+fn whichColor(buf: []const u8) ?Color {
+    
+    return switch (buf.len) {
+        3 => Color.red,
+        4 => Color.blue,
+        5 => Color.green,
+        else => null
+    };
+}
+
 const Game = struct {
     pullList: []Pull,
     id: u32,
 
     pub fn init(allocator: std.mem.Allocator) Game {
-        var pullList = std.ArrayList(Pull).init(allocator);
-
         return Game {
             .id = undefined,
-            .pullList = pullList,
+            .pullList = std.ArrayList(Pull).init(allocator),
         };
     }
 
@@ -26,27 +39,44 @@ const Game = struct {
     pub fn parseGame(reader: anytype, allocator: std.mem.Allocator) !Game {
         var game = Game.init(allocator);
         var buffer: [32]u8 = undefined;
-        const input = try reader.readUntilDelimiterOrEof()
+
+        // Read in ID
+        const idInput = try reader.readUntilDelimiter(&buffer, ':');
+        var idSplitter = std.mem.split(u8, idInput, " ");
+        _ = idSplitter.next().?; // Don't need first half
+        const column_half = idSplitter.next() orelse return error.ParseError;
+        game.id = try std.fmt.parseUnsigned(u32, column_half, 10);
+
+        // Read in pullList
+        const pullsInput = try reader.readUntilDelimiter(&buffer, '\n');
+        var pullsSplitter = std.mem.split(u8, pullsInput, ";");
+        while (true) {
+            const singlePull = pullsSplitter.next() orelse break;
+            var colorSplitter = std.mem.split(u8, singlePull, ",");
+
+            while (true) {
+                var pull: Pull = undefined;
+                const singleColor = colorSplitter.next() orelse break;
+                var valueSplitter = std.mem.split(u8, singleColor, " ");
+
+                const col1 = valueSplitter.next() orelse return error.ParseError;
+                const col2 = valueSplitter.next() orelse return error.ParseError;
+
+                const num: u32 = std.fmt.parseUnsigned(u32, col1, 10) orelse return error.ParseError;
+                const color = whichColor(col2).?;
+                switch (color) {
+                    Color.red => {pull.red = num;},
+                    Color.green => {pull.green = num;},
+                    Color.blue => {pull.blue = num;},
+                }
+
+                game.pullList.append(pull) orelse return error.OutOfMemoryError;
+            }
+        }
+
+        return game;
     }
 };
-
-fn nextLine(reader: anytype, buffer: []u8) !?[]const u8 {
-    const line = (try reader.readUntilDelimiterOrEof(
-        buffer,
-        '\n',
-    )) orelse return null;
-
-    // trim annoying windows-only carriage return character
-    if (@import("builtin").os.tag == .windows) {
-        return std.mem.trimRight(u8, line, "\r");
-    } else {
-        return line;
-    }
-}
-
-fn parseGame(reader: anytype) !Game {
-
-}
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -57,6 +87,6 @@ pub fn main() !void {
 
 
     while (true) {
-        const input = (try nextLine(stdin.reader(), &buffer)) orelse break;
+
     }
 }
