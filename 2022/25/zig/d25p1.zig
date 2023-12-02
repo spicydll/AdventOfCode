@@ -16,7 +16,8 @@ fn nextLine(reader: anytype, buffer: []u8) !?[]const u8 {
 
 fn pow(x: i64, y: u64) i64 {
     var prod: i64 = 1;
-    for (1..@as(usize, y)) |_| {
+    var counter: u64 = 0;
+    while (counter < y) : (counter += 1) {
         prod *= x;
     }
 
@@ -47,17 +48,15 @@ fn fromSnafu(buffer: []const u8) ?i64 {
 }
 
 fn toSnafu(number: i64, buffer: []u8) !usize {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
+    const allocator = std.heap.page_allocator;
     var stack = std.ArrayList(u8).init(allocator);
+    defer stack.deinit();
     var carry = false;
-    var digit: u8 = undefined;
     var l_number = number;
 
     while (l_number != 0) {
         var r: i64 = @mod(l_number, 5);
-        defer l_number = @divFloor(l_number, 5);
+        l_number = @divFloor(l_number, 5);
 
         if (carry) {
             r += 1;
@@ -68,7 +67,7 @@ fn toSnafu(number: i64, buffer: []u8) !usize {
             r -= 5;
             carry = true;
         }
-        digit = switch (r) {
+        const digit: u8 = switch (r) {
             0 => '0',
             1 => '1',
             2 => '2',
@@ -77,13 +76,13 @@ fn toSnafu(number: i64, buffer: []u8) !usize {
             else => '?',
         };
 
-        try stack.append(digit);
+        stack.append(digit) catch return error.outOfMemory;
     }
 
     const stack_size = stack.items.len;
-    for (0..stack_size) |i| {
-        buffer[i] = stack.pop();
-    }
+    if (buffer.len < stack_size) return error.bufferTooSmall;
+
+    std.mem.copyBackwards(u8, buffer, stack.items);
 
     return stack_size;
 }
