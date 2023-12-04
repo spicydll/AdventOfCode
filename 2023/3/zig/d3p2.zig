@@ -32,17 +32,21 @@ fn partOfNum(slice: []const u8, index: usize) ?NumLoc {
         end = slice.len;
     }
 
+    var true_begin = begin;
     while (begin >= 0) : (begin -= 1) {
         //std.debug.print("begin: {d}\n", .{begin});
         num = (std.fmt.parseUnsigned(u32, slice[begin..end], 10)) catch break;
+        true_begin = begin;
         if (begin == 0) {
             break;
         }
     }
 
+    begin = true_begin;
+    true_end = index;
     while (end <= slice.len) : (end += 1) {
         num = (std.fmt.parseUnsigned(u32, slice[begin..end], 10)) catch break;
-        true_end = end;
+        true_end = end - 1;
     }
 
     return NumLoc{ .num = num, .end = true_end };
@@ -83,14 +87,16 @@ pub fn main() !void {
                         if (partOfNum(matrix[row], col)) |number| {
                             if (nums[0] == null) {
                                 nums[0] = number.num;
-                                col = number.end - 1;
+                                col = number.end;
                             } else if (nums[1] == null) {
                                 nums[1] = number.num;
-                                col = number.end - 1;
+                                col = number.end;
                             } else {
                                 too_many = true;
                                 break;
                             }
+                        } else {
+                            //std.debug.print("not a number\n", .{});
                         }
                     }
 
