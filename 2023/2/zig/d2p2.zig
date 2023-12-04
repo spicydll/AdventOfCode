@@ -92,28 +92,27 @@ pub fn main() !void {
 
     while (true) {
         const game = (try Game.parseGame(stdin.reader(), allocator)) orelse break;
-        var possible = true;
 
-        //std.debug.print("Game {}\n", .{game.id});
-        for (game.pullList.items) |pull| {
-            //std.debug.print(" Red: {}\n", .{pull.red});
-            //std.debug.print(" Green: {}\n", .{pull.green});
-            //std.debug.print(" Blue: {}\n", .{pull.blue});
-
-            if (pull.red > 12 or pull.green > 13 or pull.blue > 14) {
-                possible = false;
-                //std.debug.print("Game {} is NOT possible...\n", .{game.id});
-                break;
-            }
-        }
-        if (possible) {
-            try gameList.append(game);
-        }
+        try gameList.append(game);
     }
 
     var sum: u32 = 0;
     for (gameList.items) |game| {
-        sum += game.id;
+        var set: Pull = .{ .red = 0, .green = 0, .blue = 0 };
+
+        for (game.pullList.items) |pull| {
+            if (pull.red > set.red) {
+                set.red = pull.red;
+            }
+            if (pull.green > set.green) {
+                set.green = pull.green;
+            }
+            if (pull.blue > set.blue) {
+                set.blue = pull.blue;
+            }
+        }
+        const power = set.red * set.green * set.blue;
+        sum += power;
     }
 
     try stdout.writer().print("Sum: {}\n", .{sum});
