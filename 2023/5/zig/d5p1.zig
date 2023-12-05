@@ -7,15 +7,15 @@ const Mapping = struct {
 
     pub fn parseMapping(buf: []const u8) !Mapping {
         var mapping: Mapping = undefined;
-        const splitter = std.mem.split(u8, buf, " ");
+        var splitter = std.mem.split(u8, buf, " ");
 
-        const dest_str = splitter.next();
+        const dest_str = splitter.next() orelse return error.ParseError;
         mapping.destination = try std.fmt.parseUnsigned(u64, dest_str, 10);
 
-        const src_str = splitter.next();
+        const src_str = splitter.next() orelse return error.ParseError;
         mapping.source = try std.fmt.parseUnsigned(u64, src_str, 10);
 
-        const range_str = splitter.next();
+        const range_str = splitter.next() orelse return error.ParseError;
         mapping.range = try std.fmt.parseUnsigned(u64, range_str, 10);
 
         return mapping;
@@ -44,25 +44,25 @@ fn mapInList(mapping_list: []const Mapping, src_number: u64) u64 {
 
 const MappingList = []const Mapping;
 
-fn parseMappingList(reader: std.io.AnyReader, allocator: std.mem.Allocator) !?MappingList {
+fn parseMappingList(reader: anytype, allocator: std.mem.Allocator) !?MappingList {
     var buf: [1024]u8 = undefined;
-    _ = (try reader.readUntilDelimiterOrEof(&buf, "\n")) orelse return null;
+    _ = (try reader.readUntilDelimiterOrEof(&buf, '\n')) orelse return null;
 
     var mappingList = std.ArrayList(Mapping).init(allocator);
     defer mappingList.deinit();
     while (true) {
-        const line = (try reader.readUntilDelimiterOrEof(&buf, "\n")) orelse break;
+        const line = (try reader.readUntilDelimiterOrEof(&buf, '\n')) orelse break;
         const mapping = Mapping.parseMapping(line) catch break;
 
         try mappingList.append(mapping);
     }
 
-    return mappingList.toOwnedSlice();
+    return try mappingList.toOwnedSlice();
 }
 
-fn parseSeeds(reader: std.io.AnyReader, allocator: std.mem.Allocator) ![]const u64 {
+fn parseSeeds(reader: anytype, allocator: std.mem.Allocator) ![]const u64 {
     var buf: [1024]u8 = undefined;
-    const line = try reader.readUntilDelimiterOrEof(&buf, "\n");
+    const line = (try reader.readUntilDelimiterOrEof(&buf, '\n')) orelse return error.ParseError;
 
     var splitter = std.mem.split(u8, line, " ");
     _ = splitter.next();
@@ -83,8 +83,30 @@ pub fn main() !void {
     const allocator = arena.allocator();
     const stdin = std.io.getStdIn();
 
-    const seeds = parseSeeds(stdin.reader(), allocator);
-    _ = seeds;
+    const seeds = try parseSeeds(stdin.reader(), allocator);
 
-    try stdin.reader().skipUntilDelimiterOrEof("\n");
+    try stdin.reader().skipUntilDelimiterOrEof('\n');
+
+    var map_lists = std.ArrayList(MappingList).init(allocator);
+    defer map_lists.deinit();
+
+    while (try parseMappingList(stdin.reader(), allocator)) |mapping_list| {
+        try map_lists.append(mapping_list);
+    }
+
+    const mapping_lists = try map_lists.toOwnedSlice();
+
+    var low_location: ?u64 = null;
+    for (seeds) |seed| {
+        var src_num: u64 = seed;
+        for (mapping_lists) |mapping_list| {
+            src_num = mapInList(mapping_list, src_num);
+        }
+
+        if (low_location == null or src_num < low_location.?) {
+            low_location = src_num;
+        }
+    }
+
+    try std.io.getStdOut().writer().print("Low Location: {d}\n", .{low_location.?});
 }
