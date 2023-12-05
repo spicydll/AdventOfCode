@@ -63,7 +63,8 @@ fn parseMappingList(reader: anytype, allocator: std.mem.Allocator) !?MappingList
     }
 
     var unsorted_list: []Mapping = try mappingList.toOwnedSlice();
-    std.mem.sort(Mapping, &unsorted_list, {}, mapInList);
+    unsorted_list[0] = unsorted_list[0];
+    std.mem.sort(Mapping, unsorted_list, {}, cmpMapping);
     return unsorted_list;
 }
 
