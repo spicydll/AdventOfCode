@@ -30,6 +30,19 @@ const Mapping = struct {
 
         return self.destination + difference;
     }
+
+    pub fn mapRange(self: Mapping, range: Seed) ?Seed {
+        if (self.source > range.start or (self.source + self.range) <= range.start) {
+            return null;
+        }
+
+        const start: u64 = self.map(range.start) orelse return null;
+        var new_range: u64 = range.range;
+        if ((self.destination + self.range) > (start + new_range)) {
+            new_range = (start + new_range) - (self.destination + self.range);
+        }
+        return .{ .start = start, .range = new_range };
+    }
 };
 
 fn mapInList(mapping_list: []const Mapping, src_number: u64) u64 {

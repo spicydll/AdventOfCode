@@ -73,52 +73,53 @@ fn checkDirectives(directives: []const Directive) bool {
     return true;
 }
 
-fn countSteps(directives: []const Directive, directions: []const u8, allocator: std.mem.Allocator) !u128 {
-    var steps: u128 = 1;
-    var big_steps: u128 = 1;
+fn GCD(a: u128, b: u128) u128 {
+    if (b == 0) {
+        return a;
+    }
+    return GCD(b, a % b);
+}
 
-    var cur_directives = std.ArrayList(Directive).init(allocator);
+fn LCM(numbers: []u128) u128 {
+    if (numbers.len == 2) {
+        return (numbers[0] * numbers[1]) / GCD(numbers[0], numbers[1]);
+    }
+
+    return LCM(.{ numbers[0], (LCM(numbers[1..])) });
+}
+
+fn countSteps(directives: []const Directive, directions: []const u8, allocator: std.mem.Allocator) !u128 {
+    var path_list = std.ArrayList(u128).init(allocator);
 
     for (directives) |dir| {
-        if (dir.name[dir.name.len - 1] == 'Z') {
-            try cur_directives.append(dir);
+        if (dir.name[dir.name.len - 1] == 'A') {
+            var dir_steps: u128 = 1;
+            var cur_dir = dir;
+            var done = false;
+
+            while (!done) {
+                for (directions) |direction| {
+                    defer dir_steps += 1;
+                    if (direction == 'L') {
+                        cur_dir = cur_dir.left_ptr.*;
+                    } else {
+                        cur_dir = cur_dir.right_ptr.*;
+                    }
+
+                    if (cur_dir.name[cur_dir.name.len - 1] == 'Z') {
+                        done = true;
+                        break;
+                    }
+                }
+            }
+
+            try path_list.append(dir_steps);
         }
     }
 
-    var cur_dirs = try cur_directives.toOwnedSlice();
+    const path_lens = try path_list.toOwnedSlice();
 
-    var finished = false;
-    while (!finished) {
-        if (big_steps >= 1000000) {
-            std.debug.print("steps: {d}\r", .{steps});
-            big_steps = 0;
-        }
-        for (directions) |direction| {
-            defer steps += 1;
-            defer big_steps += 1;
-            finished = true;
-            for (cur_dirs, 0..) |dir, i| {
-                var new_directive: *Directive = undefined;
-                if (direction == 'L') {
-                    new_directive = dir.left_ptr;
-                } else {
-                    new_directive = dir.right_ptr;
-                }
-
-                if (finished and new_directive.name[new_directive.name.len - 1] != 'Z') {
-                    finished = false;
-                }
-
-                cur_dirs[i] = new_directive.*;
-            }
-
-            if (finished) {
-                return steps;
-            }
-        }
-    }
-
-    return steps;
+    return LCM(path_lens);
 }
 
 pub fn main() !void {
