@@ -80,12 +80,15 @@ fn GCD(a: u128, b: u128) u128 {
     return GCD(b, a % b);
 }
 
-fn LCM(numbers: []u128) u128 {
+fn LCM(numbers: []const u128) u128 {
     if (numbers.len == 2) {
         return (numbers[0] * numbers[1]) / GCD(numbers[0], numbers[1]);
     }
 
-    return LCM(.{ numbers[0], (LCM(numbers[1..])) });
+    var params: [2]u128 = undefined;
+    params[0] = numbers[0];
+    params[1] = LCM(numbers[1..]);
+    return LCM(&params);
 }
 
 fn countSteps(directives: []const Directive, directions: []const u8, allocator: std.mem.Allocator) !u128 {
@@ -93,7 +96,7 @@ fn countSteps(directives: []const Directive, directions: []const u8, allocator: 
 
     for (directives) |dir| {
         if (dir.name[dir.name.len - 1] == 'A') {
-            var dir_steps: u128 = 1;
+            var dir_steps: u128 = 0;
             var cur_dir = dir;
             var done = false;
 
@@ -112,6 +115,8 @@ fn countSteps(directives: []const Directive, directions: []const u8, allocator: 
                     }
                 }
             }
+
+            std.debug.print("Number: {d}\n", .{dir_steps});
 
             try path_list.append(dir_steps);
         }
