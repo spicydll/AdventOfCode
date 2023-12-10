@@ -39,6 +39,32 @@ const Coordinate = struct {
     pub fn moveRight(self: Coordinate) Coordinate {
         return .{ .x = self.x + 1, .y = self.y };
     }
+
+    pub fn rightOfEdge(self: Coordinate) bool {
+        return self.x == 0;
+    }
+
+    pub fn leftOfEdge(self: Coordinate, right_edge: usize) bool {
+        return self.x == right_edge - 1;
+    }
+
+    pub fn belowEdge(self: Coordinate) bool {
+        return self.y == 0;
+    }
+
+    pub fn aboveEdge(self: Coordinate, bottom_edge: usize) bool {
+        return self.y == bottom_edge - 1;
+    }
+
+    pub fn in(self: Coordinate, list: []const Coordinate) bool {
+        for (list) |coord| {
+            if (std.meta.eql(self, coord)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 };
 
 const PipeTile = enum {
@@ -157,37 +183,149 @@ const Maze = struct {
         return maze;
     }
 
-    pub fn measure(self: Maze) u32 {
-        var steps: u32 = 1;
-
+    pub fn countInside(self: Maze, allocator: std.mem.Allocator) !usize {
         var cur_coord = self.start;
-        const check_coords: [4]Coordinate = .{ .{ .x = cur_coord.x - 1, .y = cur_coord.y }, .{ .x = cur_coord.x + 1, .y = cur_coord.y }, .{ .x = cur_coord.x, .y = cur_coord.y - 1 }, .{ .x = cur_coord.x, .y = cur_coord.y + 1 } };
+        const right_edge = self.text[0].len;
+        const bottom_edge = self.text.len;
+        var check_coords_list = std.ArrayList(Coordinate).init(allocator);
+        defer check_coords_list.deinit();
 
+        if (!self.start.rightOfEdge()) {
+            try check_coords_list.append(self.start.moveLeft());
+        }
+        if (!self.start.belowEdge()) {
+            try check_coords_list.append(self.start.moveUp());
+        }
+        if (!self.start.leftOfEdge(right_edge)) {
+            try check_coords_list.append(self.start.moveRight());
+        }
+        if (!self.start.aboveEdge(bottom_edge)) {
+            try check_coords_list.append(self.start.moveDown());
+        }
+
+        const check_coords = try check_coords_list.toOwnedSlice();
+        if (check_coords.len == 0) {
+            return error.LoopImpossible;
+        }
+
+        var loop_coords = std.ArrayList(Coordinate).init(allocator);
+        defer loop_coords.deinit();
+        try loop_coords.append(self.start);
         var next_coord: Coordinate = undefined;
         // find a way in from start
         for (check_coords) |coord| {
             if (self.at(coord).traverse(self.start, coord)) |next| {
                 cur_coord = coord;
+                try loop_coords.append(cur_coord);
                 next_coord = next;
                 break;
             }
         }
 
+        // traverse the loop until start again
         while (self.at(next_coord).traverse(cur_coord, next_coord)) |next| {
-            std.debug.print("cur_coord ({any}): {any}\n", .{ cur_coord, self.at(cur_coord) });
-            //std.debug.print("- next_coord ({any}): {any}\n", .{ next_coord, self.at(next_coord) });
-            //std.debug.print("- next ({any}): {any}\n", .{ next, self.at(next) });
-            steps += 1;
+            try loop_coords.append(next_coord);
             cur_coord = next_coord;
             next_coord = next;
         }
 
-        var dist: u32 = @divFloor(steps, 2);
-        if (dist * 2 < steps) {
-            dist += 1;
+        const loop = try loop_coords.toOwnedSlice();
+
+        var inside_coords = std.ArrayList(Coordinate).init(allocator);
+        defer inside_coords.deinit();
+        // Go right from every coord
+        for (loop) |loop_coord| {
+            cur_coord = loop_coord;
+            var cur_coords = std.ArrayList(Coordinate).init(allocator);
+            defer cur_coords.deinit();
+            var inside = true;
+            var last_in_loop = true;
+            while (!cur_coord.leftOfEdge(right_edge)) {
+                cur_coord = cur_coord.moveRight();
+
+                if (cur_coord.in(loop)) {
+                    if (last_in_loop) {
+                        break;
+                    }
+                    if (inside) {
+                        const new_coords = try cur_coords.toOwnedSlice();
+                        try inside_coords.appendSlice(new_coords);
+                    }
+                    inside = !inside;
+                    last_in_loop = true;
+                } else if (inside) {
+                    try cur_coords.append(cur_coord);
+                    last_in_loop = false;
+                }
+            }
         }
 
-        return dist;
+        const inside_right = try inside_coords.toOwnedSlice();
+
+        var inside_coords_down = std.ArrayList(Coordinate).init(allocator);
+        defer inside_coords_down.deinit();
+        for (inside_right) |inside_coord| {
+            cur_coord = inside_coord;
+            var loop_found = false;
+            while (!cur_coord.aboveEdge(bottom_edge)) {
+                cur_coord = cur_coord.moveDown();
+
+                if (cur_coord.in(loop)) {
+                    loop_found = !loop_found;
+                }
+            }
+
+            if (loop_found) {
+                try inside_coords_down.append(inside_coord);
+            }
+        }
+
+        const inside_down = try inside_coords_down.toOwnedSlice();
+
+        var inside_coords_up = std.ArrayList(Coordinate).init(allocator);
+        defer inside_coords_up.deinit();
+
+        for (inside_down) |inside_coord| {
+            cur_coord = inside_coord;
+            var loop_found = false;
+            while (!cur_coord.belowEdge()) {
+                cur_coord = cur_coord.moveUp();
+
+                if (cur_coord.in(loop)) {
+                    loop_found = !loop_found;
+                }
+            }
+
+            if (loop_found) {
+                try inside_coords_up.append(inside_coord);
+            }
+        }
+
+        const inside_up = try inside_coords_up.toOwnedSlice();
+
+        var inside_coords_left = std.ArrayList(Coordinate).init(allocator);
+        defer inside_coords_left.deinit();
+
+        for (inside_up) |inside_coord| {
+            cur_coord = inside_coord;
+            var loop_found = false;
+            while (!cur_coord.rightOfEdge()) {
+                cur_coord = cur_coord.moveLeft();
+
+                if (cur_coord.in(loop)) {
+                    loop_found = !loop_found;
+                }
+            }
+
+            if (loop_found) {
+                try inside_coords_left.append(inside_coord);
+            }
+        }
+
+        const inside = try inside_coords_left.toOwnedSlice();
+        //std.debug.print("{any}\n", .{inside});
+
+        return inside.len;
     }
 
     pub fn at(self: Maze, coord: Coordinate) PipeTile {
@@ -274,7 +412,7 @@ pub fn main() !void {
     const stdin = std.io.getStdIn();
 
     var maze = try Maze.parseMaze(stdin.reader(), allocator);
-    const dist = maze.measure();
+    const dist = try maze.countInside(allocator);
 
-    try std.io.getStdOut().writer().print("Distance: {d}\n", .{dist});
+    try std.io.getStdOut().writer().print("Inside Nodes: {d}\n", .{dist});
 }
