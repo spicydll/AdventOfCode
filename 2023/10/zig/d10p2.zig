@@ -174,7 +174,7 @@ const Maze = struct {
         }
 
         while (self.at(next_coord).traverse(cur_coord, next_coord)) |next| {
-            //std.debug.print("cur_coord ({any}): {any}\n", .{ cur_coord, self.at(cur_coord) });
+            std.debug.print("cur_coord ({any}): {any}\n", .{ cur_coord, self.at(cur_coord) });
             //std.debug.print("- next_coord ({any}): {any}\n", .{ next_coord, self.at(next_coord) });
             //std.debug.print("- next ({any}): {any}\n", .{ next, self.at(next) });
             steps += 1;
