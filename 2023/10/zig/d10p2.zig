@@ -231,101 +231,32 @@ const Maze = struct {
 
         const loop = try loop_coords.toOwnedSlice();
 
-        var inside_coords = std.ArrayList(Coordinate).init(allocator);
-        defer inside_coords.deinit();
-        // Go right from every coord
-        for (loop) |loop_coord| {
-            cur_coord = loop_coord;
-            var cur_coords = std.ArrayList(Coordinate).init(allocator);
-            defer cur_coords.deinit();
-            var inside = true;
-            var last_in_loop = true;
-            while (!cur_coord.leftOfEdge(right_edge)) {
-                cur_coord = cur_coord.moveRight();
+        var area: i32 = 0;
+        for (loop[0 .. loop.len - 1], loop[1..loop.len]) |c0, c1| {
+            const x0: i32 = @as(i32, @intCast(c0.x));
+            const y0: i32 = @as(i32, @intCast(c0.y));
+            const x1: i32 = @as(i32, @intCast(c1.x));
+            const y1: i32 = @as(i32, @intCast(c1.y));
 
-                if (cur_coord.in(loop)) {
-                    if (last_in_loop) {
-                        break;
-                    }
-                    if (inside) {
-                        const new_coords = try cur_coords.toOwnedSlice();
-                        try inside_coords.appendSlice(new_coords);
-                    }
-                    inside = !inside;
-                    last_in_loop = true;
-                } else if (inside) {
-                    try cur_coords.append(cur_coord);
-                    last_in_loop = false;
-                }
-            }
+            area += (x0 * y1) - (x1 * y0);
         }
 
-        const inside_right = try inside_coords.toOwnedSlice();
+        const c0 = loop[loop.len - 1];
+        const c1 = loop[0];
+        const x0: i32 = @as(i32, @intCast(c0.x));
+        const y0: i32 = @as(i32, @intCast(c0.y));
+        const x1: i32 = @as(i32, @intCast(c1.x));
+        const y1: i32 = @as(i32, @intCast(c1.y));
 
-        var inside_coords_down = std.ArrayList(Coordinate).init(allocator);
-        defer inside_coords_down.deinit();
-        for (inside_right) |inside_coord| {
-            cur_coord = inside_coord;
-            var loop_found = false;
-            while (!cur_coord.aboveEdge(bottom_edge)) {
-                cur_coord = cur_coord.moveDown();
+        area += (x0 * y1) - (x1 * y0);
 
-                if (cur_coord.in(loop)) {
-                    loop_found = !loop_found;
-                }
-            }
-
-            if (loop_found) {
-                try inside_coords_down.append(inside_coord);
-            }
+        if (area < 0) {
+            area *= -1;
         }
 
-        const inside_down = try inside_coords_down.toOwnedSlice();
+        const inside: usize = @divFloor(@as(usize, @intCast(area)) - loop.len, 2) + 1;
 
-        var inside_coords_up = std.ArrayList(Coordinate).init(allocator);
-        defer inside_coords_up.deinit();
-
-        for (inside_down) |inside_coord| {
-            cur_coord = inside_coord;
-            var loop_found = false;
-            while (!cur_coord.belowEdge()) {
-                cur_coord = cur_coord.moveUp();
-
-                if (cur_coord.in(loop)) {
-                    loop_found = !loop_found;
-                }
-            }
-
-            if (loop_found) {
-                try inside_coords_up.append(inside_coord);
-            }
-        }
-
-        const inside_up = try inside_coords_up.toOwnedSlice();
-
-        var inside_coords_left = std.ArrayList(Coordinate).init(allocator);
-        defer inside_coords_left.deinit();
-
-        for (inside_up) |inside_coord| {
-            cur_coord = inside_coord;
-            var loop_found = false;
-            while (!cur_coord.rightOfEdge()) {
-                cur_coord = cur_coord.moveLeft();
-
-                if (cur_coord.in(loop)) {
-                    loop_found = !loop_found;
-                }
-            }
-
-            if (loop_found) {
-                try inside_coords_left.append(inside_coord);
-            }
-        }
-
-        const inside = try inside_coords_left.toOwnedSlice();
-        //std.debug.print("{any}\n", .{inside});
-
-        return inside.len;
+        return inside;
     }
 
     pub fn at(self: Maze, coord: Coordinate) PipeTile {
