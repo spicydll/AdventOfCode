@@ -130,10 +130,13 @@ const SpringRow = struct {
     }
 
     fn permuteToSum(sum: u64, num: usize, min: u64, allocator: std.mem.Allocator) std.ArrayList([]const u64) {
-        _ = allocator;
         _ = min;
-        _ = num;
         _ = sum;
+        var numbers: [num]u64 = undefined;
+        _ = numbers;
+        var perm_list = std.ArrayList([]u64).init(allocator);
+        _ = perm_list;
+
         
     }
 
