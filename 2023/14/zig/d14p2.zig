@@ -17,11 +17,18 @@ const RockType = enum {
 
 const Dish = struct {
     rocks: [][]RockType,
+    memos: [][]usize,
     const Self = @This();
 
     pub fn parseDish(reader: anytype, allocator: std.mem.Allocator) !Dish {
         var rocks_list = std.ArrayList([]RockType).init(allocator);
         defer rocks_list.deinit();
+        var memos_list = std.ArrayList([]usize).init(allocator);
+        defer memos_list.deinit();
+
+        var cur_memos_list = std.ArrayList(usize).init(allocator);
+        defer cur_memos_list.deinit();
+        var cur_memos: ?[]usize = null;
 
         while (true) {
             var line_list = std.ArrayList(u8).init(allocator);
@@ -32,10 +39,19 @@ const Dish = struct {
 
             var row_list = std.ArrayList(RockType).init(allocator);
             defer row_list.deinit();
+            var memo_list = std.ArrayList(usize).init(allocator);
+            defer memo_list.deinit();
 
             for (line) |c| {
                 const rock = try RockType.fromChar(c);
                 try row_list.append(rock);
+                if (cur_memos == null) {
+                    try cur_memos_list.append(0);
+                }
+            }
+
+            if (cur_memos == null) {
+                cur_memos = try cur_memos_list.toOwnedSlice();
             }
 
             const row = try row_list.toOwnedSlice();
