@@ -17,18 +17,11 @@ const RockType = enum {
 
 const Dish = struct {
     rocks: [][]RockType,
-    memos: [][]usize,
     const Self = @This();
 
     pub fn parseDish(reader: anytype, allocator: std.mem.Allocator) !Dish {
         var rocks_list = std.ArrayList([]RockType).init(allocator);
         defer rocks_list.deinit();
-        var memos_list = std.ArrayList([]usize).init(allocator);
-        defer memos_list.deinit();
-
-        var cur_memos_list = std.ArrayList(usize).init(allocator);
-        defer cur_memos_list.deinit();
-        var cur_memos: ?[]usize = null;
 
         while (true) {
             var line_list = std.ArrayList(u8).init(allocator);
@@ -39,19 +32,10 @@ const Dish = struct {
 
             var row_list = std.ArrayList(RockType).init(allocator);
             defer row_list.deinit();
-            var memo_list = std.ArrayList(usize).init(allocator);
-            defer memo_list.deinit();
 
             for (line) |c| {
                 const rock = try RockType.fromChar(c);
                 try row_list.append(rock);
-                if (cur_memos == null) {
-                    try cur_memos_list.append(0);
-                }
-            }
-
-            if (cur_memos == null) {
-                cur_memos = try cur_memos_list.toOwnedSlice();
             }
 
             const row = try row_list.toOwnedSlice();
@@ -135,9 +119,25 @@ const Dish = struct {
         }
     }
 
-    pub fn spinCycle(self: *Self, cycles: usize) void {
+    pub fn spinCycle(self: *Self, cycles: usize, allocator: std.mem.Allocator) !void {
+        var cycle_rocks_list = std.ArrayList([]const RockType).init(allocator);
+        defer cycle_rocks_list.deinit();
+
+        self.rollRocksNorth();
+        self.rollRocksWest();
+        self.rollRocksSouth();
+        self.rollRocksEast();
+
+        for (self.rocks) |row| {
+            const row_copy = try allocator.dupe(RockType, row);
+            try cycle_rocks_list.append(row_copy);
+        }
+        const cycle_rocks = try cycle_rocks_list.toOwnedSlice();
+
+        var remainder: usize = undefined;
+        var cycle_detected = false;
         var print_cycle: i32 = 0;
-        for (0..cycles) |i| {
+        for (1..cycles) |i| {
             defer print_cycle += 1;
             if (print_cycle >= 999999) {
                 std.debug.print("Cycle: {d}\r", .{i + 1});
@@ -147,12 +147,35 @@ const Dish = struct {
             self.rollRocksWest();
             self.rollRocksSouth();
             self.rollRocksEast();
+
+            cycle_detected = true;
+            for (self.rocks, cycle_rocks) |rock_row, cycle_row| {
+                if (!std.mem.eql(RockType, rock_row, cycle_row)) {
+                    cycle_detected = false;
+                    break;
+                }
+            }
+
+            if (cycle_detected) {
+                std.debug.print("Cycle detected with period of {d}\n", .{i - 1});
+                remainder = (cycles - 1) % (i - 1);
+                break;
+            }
+        }
+
+        if (cycle_detected) {
+            for (0..remainder) |_| {
+                self.rollRocksNorth();
+                self.rollRocksWest();
+                self.rollRocksSouth();
+                self.rollRocksEast();
+            }
         }
         std.debug.print("\n", .{});
     }
 
-    pub fn calculateLoad(self: *Self) u64 {
-        self.spinCycle(1000000000);
+    pub fn calculateLoad(self: *Self, allocator: std.mem.Allocator) !u64 {
+        try self.spinCycle(1000000000, allocator);
         var load: u64 = 0;
         var row_load: u64 = @as(u64, @intCast(self.rocks.len));
         for (self.rocks) |row| {
@@ -166,7 +189,28 @@ const Dish = struct {
 
         return load;
     }
+
+    test "parseDish" {
+        const test_dish_text = 
+            \\O....#....
+            \\O.OO#....#
+            \\.....##...
+            \\OO.#O....O
+            \\.O.....O#.
+            \\O.#..O.#.#
+            \\..O..#O..O
+            \\.......O..
+            \\#....###..
+            \\#OO..#....
+            ;
+        _ = test_dish_text;
+        
+    }
 };
+
+test {
+    std.testing.refAllDecls(@This());
+}
 
 pub fn main() !void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
@@ -175,7 +219,7 @@ pub fn main() !void {
     const stdin = std.io.getStdIn();
 
     var dish = try Dish.parseDish(stdin.reader(), allocator);
-    const load = dish.calculateLoad();
+    const load = try dish.calculateLoad(allocator);
 
     try std.io.getStdOut().writer().print("Load: {d}\n", .{load});
 }
