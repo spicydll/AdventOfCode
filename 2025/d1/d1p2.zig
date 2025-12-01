@@ -4,7 +4,7 @@ const Writer = std.io.Writer;
 
 fn parseLine(r: *Reader) !?i32 {
     const line = try r.takeDelimiter('\n') orelse return null;
-    
+
     if (line.len < 2) {
         return error.BadInput;
     }
@@ -83,7 +83,7 @@ fn getPass(r: *Reader, w: *Writer) !u32 {
 }
 
 test {
-    const test_input = 
+    const test_input =
         \\L68
         \\L30
         \\R48
@@ -101,7 +101,7 @@ test {
     var the_void: [1024]u8 = undefined;
     var test_writer: Writer.Discarding = .init(&the_void);
     const w = &test_writer.writer;
-    
+
     try std.testing.expectEqual(6, try getPass(r, w));
 }
 

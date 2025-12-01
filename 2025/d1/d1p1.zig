@@ -3,7 +3,7 @@ const Reader = std.io.Reader;
 
 fn parseLine(r: *Reader) !?i32 {
     const line = try r.takeDelimiter('\n') orelse return null;
-    
+
     if (line.len < 2) {
         return error.BadInput;
     }
