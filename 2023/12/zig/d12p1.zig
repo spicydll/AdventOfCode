@@ -75,6 +75,7 @@ const SpringRow = struct {
         const single_possibility: u64 = 1;
         if (start_spring >= self.springs.len) {
             if (first_group >= self.damaged.len) {
+                std.debug.print("single no more springs\n", .{});
                 return single_possibility;
             }
             return impossible;
@@ -88,6 +89,7 @@ const SpringRow = struct {
                     return impossible;
                 }
             }
+            std.debug.print("single no more groups\n", .{});
             return single_possibility;
         }
 
@@ -132,7 +134,7 @@ const SpringRow = struct {
 
         var total_possibilities = self.countPossibilities(start_spring + @as(usize, @intCast(groups[0])) + 1, first_group + 1);
         total_possibilities += self.countPossibilities(start_spring + 1, first_group);
-        std.debug.print("Returning: {d}\n", .{total_possibilities});
+        std.debug.print("({d}, {d}) Returning: {d}\n", .{ start_spring, first_group, total_possibilities });
         return total_possibilities;
     }
 
